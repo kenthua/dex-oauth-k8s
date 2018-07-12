@@ -1,0 +1,146 @@
+
+= Dex with helm on k8s
+
+Dex is for https://github.com/coreos/dex/issues/384[authentication], so not much you will get out of scopes for authorization.  
+
+- Scopes are usually levereged for permission and authorization
+- Claims contain set of attributes about a user
+
+== Setup Dex via helm
+- Get Helm
+- Setup Tiller service account and role binding
+
+https://github.com/kubernetes/helm/blob/master/docs/rbac.md
+
+[source,yaml]
+----
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: tiller
+    namespace: kube-system
+EOF
+----
+
+- Setup helm
+[source,bash]
+----
+helm init --service-account tiller
+----
+
+- Make changes to `dex-values.yaml`
+NOTE: Be sure to setup the DNS for app and dex
+
+- Install dex
+[source,bash]
+----
+export GITHUB_CLIENT_ID=xxxx
+export GITHUB_CLIENT_SECRET=xxxx
+
+helm install \
+  -f dex-values.yaml \
+  --name dex \
+  --set config.connectors[0].config.clientID=$GITHUB_CLIENT_ID \
+  --set config.connectors[0].config.clientSecret=$GITHUB_CLIENT_SECRET \
+  stable/dex
+----
+
+- Quick Test
+[source,bash]
+----
+git clone https://github.com/coreos/dex
+
+cd dex
+make
+
+# get the issuer-root-ca from the dex-ca tls.crt
+# kubectl get secret dex-ca -o 'go-template={{index .data "tls.crt"}}' | base64 -d > ca.crt
+
+kubectl get secret dex-ca -o "jsonpath={.data['tls\.crt']}" | base64 -d > ca.crt
+
+./bin/example-app --issuer https://dex.gcp-testing.pitchdarkice.com:5556 --issuer-root-ca examples/k8s/ca.crt --listen http://0.0.0.0:5555 --redirect-uri http://127.0.0.1:5555/oauth2/callback
+----
+
+== Use the sample go-oauth-client app
+- Build it via Container Builder
+[source,bash]
+----
+cd go-oauth-client
+
+gcloud container builds submit . --config cloudbuild.yaml
+----
+
+- Deploy into your kubernetes environment
+[source,bash]
+----
+cd ..
+
+kubectl apply -f k8s.yaml
+----
+
+- Set the DNS
+
+== Debug
+
+- Getting logs of the go-oauth-client pod
+[source,bash]
+----
+kubectl logs -f `kubectl get pods -l app=go-oauth-client -ojsonpath={.items[0].metadata.name}`
+----
+
+- Example app output
+[source,bash]
+----
+Token:
+
+eyJhbGciO...aMfoQKLo9Pq2T5dE41eH3gdjC9onel6i2fMuSw9ZZXcRlud1wt9pXWvLAkWkD9vUFwWvTXW_LeZ0jHqT57oeJew8o9tTyfL2miLjJdZ0E4xCg
+
+Claims:
+
+{
+  "iss": "https://dex.gcp-testing.pitchdarkice.com:5556",
+  "sub": "Cgc4MDUyMzM...odWI",
+  "aud": "example-app",
+  "exp": 1531510634,
+  "iat": 1531424234,
+  "at_hash": "f4Puo....ZkvCJDTuWQ",
+  "email": "email@example.com",
+  "email_verified": true,
+  "name": "Kent Hua"
+}
+Refresh Token:
+
+ChlwZXU2c2xuaHll...1kcGVwdWc2bG83bnd4eWE3eGF1aGdz
+----
+
+- go-oauth-client output
+[source,bash]
+----
+
+code
+bwbre3mv...ymn4uk
+accessToken
+h6e6fptc...i6y7ffm22nj
+tokenType
+bearer
+refreshToken
+Chlvd3V4Z...dHBwYWF0
+rawIDToken
+eyJhbGciOiJSUzI1Ni...eBo0PnF7yRLgA
+claims
+{"iss":"https://dex.gcp-testing.pitchdarkice.com:5556","sub":"Cgc4MDUyMz...aXRodWI","aud":"go-oauth-client","exp":1531516289,"iat":1531429889,"at_hash":"zK2Knf95CUhlgxJCnnjZiw","email":"email.example.com","email_verified":true,"name":"Kent Hua","federated_claims":{"connector_id":"github","user_id":"123"}}
+----

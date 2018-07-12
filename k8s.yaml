@@ -1,0 +1,46 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: go-oauth-client
+  name: go-oauth-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-oauth-client
+  template:
+    metadata:
+      labels:
+        app: go-oauth-client
+    spec:
+      containers:
+      - env:
+        - name: CLIENT_ID
+          value: go-oauth-client
+        - name: CLIENT_SECRET
+          value: go-oauth-client-secret
+        - name: REDIRECT_URL
+          value: "http://app.gcp-testing.pitchdarkice.com/callback"
+        - name: ISSUER_URL
+          value: "https://dev.gcp-testing.pitchdarkice.com:5556"
+        image: gcr.io/kenthua-testing/go-oauth-client
+        imagePullPolicy: Always
+        name: go-oauth-client
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: go-oauth-client
+  name: go-oauth-client
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: go-oauth-client
+  sessionAffinity: None
+  type: LoadBalancer

@@ -1,0 +1,12 @@
+steps:
+  # get dependencies
+- name: 'gcr.io/cloud-builders/go'
+  args: ['get']
+  env: ['PROJECT_ROOT=go-oauth-client']
+  # build the binary
+- name: 'gcr.io/cloud-builders/go'
+  args: ['build']
+  env: ['PROJECT_ROOT=go-oauth-client']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--tag=gcr.io/$PROJECT_ID/go-oauth-client', '.']
+images: ['gcr.io/$PROJECT_ID/go-oauth-client']
