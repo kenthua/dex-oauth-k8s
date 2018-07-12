@@ -42,10 +42,11 @@ EOF
 helm init --service-account tiller
 ----
 
-- Make changes to `dex-values.yaml`
+- Make changes to `dex-values.yaml` - outputted from `helm inspect stable/dex`
+
 NOTE: Be sure to setup the DNS for app and dex
 
-- Install dex
+- Install dex https://github.com/kubernetes/charts/tree/master/stable/dex[chart]
 [source,bash]
 ----
 export GITHUB_CLIENT_ID=xxxx
