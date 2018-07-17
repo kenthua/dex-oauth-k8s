@@ -186,3 +186,5 @@ rawIDToken - claims
 accessToken - claims
 {"jti":"67c4cbfe-208e-4e5f-9d18-a5eba433b32f","exp":1531868398,"nbf":0,"iat":1531868098,"iss":"http://35.224.29.33/auth/realms/test","aud":"go-oauth-client","sub":"fde95036-c36c-4fa2-9d90-ad5e3fede34d","typ":"Bearer","azp":"go-oauth-client","auth_time":1531868098,"session_state":"da1b76cf-6f18-4ed1-93e2-092a60b56aa4","acr":"1","allowed-origins":[],"realm_access":{"roles":["offline_access","uma_authorization"]},"resource_access":{"account":{"roles":["manage-account","manage-account-links","view-profile"]}},"preferred_username":"test"}
 ----
+
+- Use https://jwt.io/[jwt.io] to parse jwt 
