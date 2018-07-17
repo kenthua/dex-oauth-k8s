@@ -1,12 +1,9 @@
-
-= Dex with helm on k8s
-
-Dex is for https://github.com/coreos/dex/issues/384[authentication], so not much you will get out of scopes for authorization.  
+= oauth with helm on k8s
 
 - Scopes are usually levereged for permission and authorization
 - Claims contain set of attributes about a user
 
-== Setup Dex via helm
+== Setup helm
 - Get Helm
 - Setup Tiller service account and role binding
 
@@ -41,6 +38,31 @@ EOF
 ----
 helm init --service-account tiller
 ----
+
+== oauth provider setup
+
+=== Setup keycloak via helm
+- Keycloak is a federated identity provider, supports SSO, oauth, oidc and saml.  It will support both authn and authz.  It can manage identities as well if configured.
+
+[source,bash]
+----
+helm install --name keycloak stable/keycloak --set keycloak.service.type=LoadBalancer
+----
+
+Configuration: 
+
+- Follow the helm instructions to retrieve password for user `keycloak`
+  * `kubectl get secret --namespace default keycloak-http -o jsonpath="{.data.password}" | base64 --decode; echo`
+- Add a new realm `test` - case sensitive to realm URI
+- Create a new client `go-oauth-client` -> Save
+- Specify `Valid Redirect URIs`: `http://app.gcp-testing.pitchdarkice.com/*`
+- Under `go-oauth-client` retrieve the `Secret` under the `Credentials` tab.  This will be used in your `k8s-keycloak.yaml` - only needed if `Authorization Enabled` in the keycloak client setup.
+- Add a user and configure password
+- For scoping, add additional role/groups
+
+=== Setup Dex via helm
+- Dex is an oauth2 / oidc provider, but it leverages connectors with 3rd party services to manage identity.
+- Dex is for https://github.com/coreos/dex/issues/384[authentication], so not much you will get out of scopes for authorization.  
 
 - Make changes to `dex-values.yaml` - outputted from `helm inspect stable/dex`
 
@@ -91,6 +113,8 @@ gcloud container builds submit . --config cloudbuild.yaml
 cd ..
 
 kubectl apply -f k8s.yaml
+# or 
+# kubectl apply -f k8s-keycloak.yaml
 ----
 
 - Set the DNS
@@ -128,8 +152,8 @@ Refresh Token:
 ChlwZXU2c2xuaHll...1kcGVwdWc2bG83bnd4eWE3eGF1aGdz
 ----
 
-- go-oauth-client output
-[source,bash]
+- go-oauth-client dex output
+[source,json]
 ----
 
 code
@@ -144,4 +168,23 @@ rawIDToken
 eyJhbGciOiJSUzI1Ni...eBo0PnF7yRLgA
 claims
 {"iss":"https://dex.gcp-testing.pitchdarkice.com:5556","sub":"Cgc4MDUyMz...aXRodWI","aud":"go-oauth-client","exp":1531516289,"iat":1531429889,"at_hash":"zK2Knf95CUhlgxJCnnjZiw","email":"email.example.com","email_verified":true,"name":"Kent Hua","federated_claims":{"connector_id":"github","user_id":"123"}}
+----
+
+- go-oauth-client keycloak output
+[source,json]
+----
+code
+eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..kymV8MGj_o0AZ2UeI6bAkg.t-7PMCTaQ8NbCIbnC5kfzLE70rlIg7lXwuoUccfCcI4FWFuvxk7j3ah-4Qfabf9LhT5pwTD2cXsobWGMwDfYDoNlFGKo6LN4HTKrWhUl9irmmjeP8yKsdQEirdEN-lWS2uaK8tYvIUWcAaHt6xpOjHiFOxvRiPtuyei-d6y25toNkrtj5iLHSWQSEF11n8y7Vq1Kmi7gdT1sH2jpFqItOGfEX83BBIzOqo-Fn3rlB6C5tKcqaMHZv12FYV9_5lID.RcpYL1p8X46hMK6UIplMoQ
+accessToken
+eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI1N28zX09uY1RGTW1FZVZMRnUtQkV4Q2lKU3VHcXpyeWN5VzR5cm9uXzY0In0.eyJqdGkiOiI2N2M0Y2JmZS0yMDhlLTRlNWYtOWQxOC1hNWViYTQzM2IzMmYiLCJleHAiOjE1MzE4NjgzOTgsIm5iZiI6MCwiaWF0IjoxNTMxODY4MDk4LCJpc3MiOiJodHRwOi8vMzUuMjI0LjI5LjMzL2F1dGgvcmVhbG1zL3Rlc3QiLCJhdWQiOiJnby1vYXV0aC1jbGllbnQiLCJzdWIiOiJmZGU5NTAzNi1jMzZjLTRmYTItOWQ5MC1hZDVlM2ZlZGUzNGQiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJnby1vYXV0aC1jbGllbnQiLCJhdXRoX3RpbWUiOjE1MzE4NjgwOTgsInNlc3Npb25fc3RhdGUiOiJkYTFiNzZjZi02ZjE4LTRlZDEtOTNlMi0wOTJhNjBiNTZhYTQiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJ0ZXN0In0.hPCoiNpLj_39BrmxO2o9sKAFqHS9mF3QHTt_ajdk5RqFnmQmfs5LxNrjyxs-tSxb8L6fWX-h7Yhh6STqz0Dy27rYNORndcHSlRuvUAirCXwGFYZYXgBXDpdP4PelqQziLpjBHrQ3ZFuVT9m3EuOBkZaCpEMsE4MryuGkMpMRQKD-US5ma1tneHksdSlCAw-gV3VVzCh_M91m3u4AtZ1Q0XQjiYsHyCLKtor-xO74bag68WZPT2Dm8_FMoEGZofeG_m72RezS5FUdEuIDbnHX4lc95idkTYDu69DA3-CfnxxUJz7eFkmUtJ9FzsoGAVHuLPXduA9DVhQrvQBGF_Uj0g
+tokenType
+bearer
+refreshToken
+eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI1N28zX09uY1RGTW1FZVZMRnUtQkV4Q2lKU3VHcXpyeWN5VzR5cm9uXzY0In0.eyJqdGkiOiI1ZTE0ZTdkNS1mOGIzLTQwZDQtYmVjMC1jZDIzNWNkYjg5NTAiLCJleHAiOjAsIm5iZiI6MCwiaWF0IjoxNTMxODY4MDk4LCJpc3MiOiJodHRwOi8vMzUuMjI0LjI5LjMzL2F1dGgvcmVhbG1zL3Rlc3QiLCJhdWQiOiJnby1vYXV0aC1jbGllbnQiLCJzdWIiOiJmZGU5NTAzNi1jMzZjLTRmYTItOWQ5MC1hZDVlM2ZlZGUzNGQiLCJ0eXAiOiJPZmZsaW5lIiwiYXpwIjoiZ28tb2F1dGgtY2xpZW50IiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiZGExYjc2Y2YtNmYxOC00ZWQxLTkzZTItMDkyYTYwYjU2YWE0IiwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19fQ.rpWYLcmbhwCsKj3fVNMCraCC1li6KVwesNBKkDnO3rwTOa-zHes56TiR_bHLEvGIiBK9XyK57ChxOaHLqlXbTmuFDMry4ci4AAMcvsErRBj-JT92WNYP5slUurdSRBiO7jzSqbteuLxq7zZIJAl3eiIZFrvQojLMIiZpCW-xYFdrViQS05Z4vLfM6i2jJuJ8_V0IJh1-ychPjwmqvrEI9Na7JGpWp2x3M0X4uFymzDIdN7QbQ7MruCXdMUYp3hr6_17IKOFeZ23L4zzLldacgTvmWhtzG7yPCoUFSXS8RNSAUXghVOpStVu_Le_hhbz2XtzMUnkBBUYVZu9PKEw3MQ
+rawIDToken
+eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI1N28zX09uY1RGTW1FZVZMRnUtQkV4Q2lKU3VHcXpyeWN5VzR5cm9uXzY0In0.eyJqdGkiOiI1MmQ3Zjc1MS00ZTQ0LTQ1NmMtYjhmMS02ZmZlMmJkZTVhOWQiLCJleHAiOjE1MzE4NjgzOTgsIm5iZiI6MCwiaWF0IjoxNTMxODY4MDk4LCJpc3MiOiJodHRwOi8vMzUuMjI0LjI5LjMzL2F1dGgvcmVhbG1zL3Rlc3QiLCJhdWQiOiJnby1vYXV0aC1jbGllbnQiLCJzdWIiOiJmZGU5NTAzNi1jMzZjLTRmYTItOWQ5MC1hZDVlM2ZlZGUzNGQiLCJ0eXAiOiJJRCIsImF6cCI6ImdvLW9hdXRoLWNsaWVudCIsImF1dGhfdGltZSI6MTUzMTg2ODA5OCwic2Vzc2lvbl9zdGF0ZSI6ImRhMWI3NmNmLTZmMTgtNGVkMS05M2UyLTA5MmE2MGI1NmFhNCIsImFjciI6IjEiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJ0ZXN0In0.ER9918AgGVCrov54qAYRNgQDwDjRtZLLu1TZKAywBxB0kHSIMx2UEt6fHN_52ffkR0Dyxokp5TwScY-_56Hz4_JitLJQz--5FrsD_MXr9ARMFkjFMFX9m3w0zW2GuZG4GPatCAJwfNrZ6GkDoSqcYBc-kbnjVoCyY37MDrQlG4b92END4AnaeKtEHIdQrpGkEagqkd7JdaotMTas-EGF4eRgVGxtzPOYxqyBJ2aATCErw1IVVZZWw7626Xl0aJZ9w1IfeUzBOgy4behJHnJ2ZFIEq4RBJuhXGXEjv2z85LV6Q1WcqjKLKBvdupyopptovtlKqzwRXcSr49IwHz-erA
+rawIDToken - claims
+{"jti":"52d7f751-4e44-456c-b8f1-6ffe2bde5a9d","exp":1531868398,"nbf":0,"iat":1531868098,"iss":"http://35.224.29.33/auth/realms/test","aud":"go-oauth-client","sub":"fde95036-c36c-4fa2-9d90-ad5e3fede34d","typ":"ID","azp":"go-oauth-client","auth_time":1531868098,"session_state":"da1b76cf-6f18-4ed1-93e2-092a60b56aa4","acr":"1","preferred_username":"test"}
+accessToken - claims
+{"jti":"67c4cbfe-208e-4e5f-9d18-a5eba433b32f","exp":1531868398,"nbf":0,"iat":1531868098,"iss":"http://35.224.29.33/auth/realms/test","aud":"go-oauth-client","sub":"fde95036-c36c-4fa2-9d90-ad5e3fede34d","typ":"Bearer","azp":"go-oauth-client","auth_time":1531868098,"session_state":"da1b76cf-6f18-4ed1-93e2-092a60b56aa4","acr":"1","allowed-origins":[],"realm_access":{"roles":["offline_access","uma_authorization"]},"resource_access":{"account":{"roles":["manage-account","manage-account-links","view-profile"]}},"preferred_username":"test"}
 ----

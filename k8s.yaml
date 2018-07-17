@@ -23,7 +23,7 @@ spec:
         - name: REDIRECT_URL
           value: "http://app.gcp-testing.pitchdarkice.com/callback"
         - name: ISSUER_URL
-          value: "https://dev.gcp-testing.pitchdarkice.com:5556"
+          value: "https://dex.gcp-testing.pitchdarkice.com:5556"
         - name: AUTH_URI
           value: "/auth"
         - name: TOKEN_URI

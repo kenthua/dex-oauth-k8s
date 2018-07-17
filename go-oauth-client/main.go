@@ -118,11 +118,19 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accessPayload, err := parseJWT(accessToken)
+	if err != nil {
+		fmt.Fprintf(w, "access odic: malformed jwt", err)
+		accessPayload = []byte("Access token not JWT, no data")
+		//http.Error(w, err.Error(), http.StatusInternalServerError)
+		//return
+	}
+
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
 	payload, err := parseJWT(rawIDToken)
 	if err != nil {
-		fmt.Fprintf(w, "odic: malformed jwt", err)
+		fmt.Fprintf(w, "raw odic: malformed jwt", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -136,10 +144,12 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("JWS")
 	log.Println(reflect.TypeOf(jws))
-	log.Println("JWT Claims Payload")
+	log.Println("JWT Access Token Claims Payload")
+	log.Println(string(accessPayload))
+	log.Println("JWT Raw ID Token Claims Payload")
 	log.Println(string(payload))
 
-	var sArray = []string{"<html><head></head><body>", "code", code, "accessToken", accessToken, "tokenType", tokenType, "refreshToken", refreshToken, "rawIDToken", rawIDToken, "claims", string(payload), "</body></html>"}
+	var sArray = []string{"<html><head></head><body>", "code", code, "accessToken", accessToken, "tokenType", tokenType, "refreshToken", refreshToken, "rawIDToken", rawIDToken, "rawIDToken - claims", string(payload), "accessToken - claims", string(accessPayload), "</body></html>"}
 
 	var output = strings.Join(sArray, "<br>")
 	fmt.Fprintf(w, output)
