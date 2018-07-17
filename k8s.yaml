@@ -24,6 +24,10 @@ spec:
           value: "http://app.gcp-testing.pitchdarkice.com/callback"
         - name: ISSUER_URL
           value: "https://dev.gcp-testing.pitchdarkice.com:5556"
+        - name: AUTH_URI
+          value: "/auth"
+        - name: TOKEN_URI
+          value: "/token"
         image: gcr.io/kenthua-testing/go-oauth-client
         imagePullPolicy: Always
         name: go-oauth-client

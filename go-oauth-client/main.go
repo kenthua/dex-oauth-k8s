@@ -18,8 +18,8 @@ import (
 
 var authEndPoint = oauth2.Endpoint{
 	// https://github.com/coreos/dex/issues/712
-	AuthURL:  os.Getenv("ISSUER_URL") + "/auth",
-	TokenURL: os.Getenv("ISSUER_URL") + "/token",
+	AuthURL:  os.Getenv("ISSUER_URL") + os.Getenv("AUTH_URI"),
+	TokenURL: os.Getenv("ISSUER_URL") + os.Getenv("TOKEN_URI"),
 }
 
 var (
